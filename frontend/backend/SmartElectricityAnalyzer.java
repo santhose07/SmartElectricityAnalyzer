@@ -1,491 +1,480 @@
 import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpExchange;
+
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
-import java.util.Scanner;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class SmartElectricityAnalyzer {
 
-    public static void main(String[] args)
-            throws IOException, ClassNotFoundException, java.sql.SQLException {
+    private static Connection dbConnection;
 
-        // SQLite connection
+    private static class Appliance {
+        String name;
+        double power;
+        double hours;
+        double rate;
+        double units;
+        double bill;
+
+        Appliance(String name, double power, double hours, double rate) {
+            this.name = name;
+            this.power = power;
+            this.hours = hours;
+            this.rate = rate;
+            this.units = (power * hours * 30) / 1000.0;
+            this.bill = this.units * rate;
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+
         Class.forName("org.sqlite.JDBC");
 
-        Connection dbConnection = DriverManager.getConnection(
+        dbConnection = DriverManager.getConnection(
                 "jdbc:sqlite:/app/electricity.db"
         );
 
-        System.out.println("Database connected successfully!");
-
-        int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
-HttpServer server = HttpServer.create(new java.net.InetSocketAddress(port), 0);
-
-        // =========================
-        // TEST API
-        // =========================
-        server.createContext("/test", exchange -> {
-
-            String response = "Java Backend Connected Successfully!";
-
-            exchange.sendResponseHeaders(200, response.length());
-            exchange.getResponseBody().write(response.getBytes());
-            exchange.getResponseBody().close();
-        });
-
-        // =========================
-        // ANALYZE API
-        // =========================
-        server.createContext("/analyze", exchange -> {
-
-            exchange.getResponseHeaders().add(
-                    "Access-Control-Allow-Origin", "*"
-            );
-
-            String query = exchange.getRequestURI().getQuery();
-
-            String[] parameters = query.split("&");
-
-            String name = parameters[0].split("=")[1];
-
-            double power =
-                    Double.parseDouble(parameters[1].split("=")[1]);
-
-            double hours =
-                    Double.parseDouble(parameters[2].split("=")[1]);
-
-            double rate =
-                    Double.parseDouble(parameters[3].split("=")[1]);
-
-            if (power <= 0 || hours <= 0 || rate <= 0) {
-
-                String response =
-                        "Please enter valid values for Power, Hours and Rate.";
-
-                exchange.sendResponseHeaders(400, response.length());
-                exchange.getResponseBody().write(response.getBytes());
-                exchange.getResponseBody().close();
-
-                return;
+        // Create the table if it does not already exist.
+        synchronized (dbConnection) {
+            try (Statement st = dbConnection.createStatement()) {
+                st.executeUpdate(
+                    "CREATE TABLE IF NOT EXISTS appliances (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    "appliance_name TEXT NOT NULL, " +
+                    "power_watts REAL NOT NULL, " +
+                    "hours_per_day REAL NOT NULL, " +
+                    "units_per_month REAL NOT NULL, " +
+                    "cost_per_month REAL NOT NULL)"
+                );
             }
+        }
 
-            double monthlyUnits =
-                    (power * hours * 30) / 1000;
+        int port = Integer.parseInt(
+                System.getenv().getOrDefault("PORT", "8080")
+        );
 
-            double monthlyBill =
-                    monthlyUnits * rate;
+        HttpServer server = HttpServer.create(
+                new java.net.InetSocketAddress(port), 0
+        );
 
-            String response =
-                    "Appliance: " + name +
-                    "\nMonthly Usage: " + monthlyUnits + " units" +
-                    "\nEstimated Monthly Bill: Rs. " + monthlyBill;
-
-            exchange.sendResponseHeaders(200, response.length());
-            exchange.getResponseBody().write(response.getBytes());
-            exchange.getResponseBody().close();
+        // TEST API
+        server.createContext("/test", exchange -> {
+            if (!prepareRequest(exchange)) return;
+            send(exchange, 200, "Java Backend Connected Successfully!");
         });
 
-        // =========================
-        // ANALYZE ALL API
-        // =========================
-        server.createContext("/analyzeAll", exchange -> {
-
-            exchange.getResponseHeaders().add(
-                    "Access-Control-Allow-Origin", "*"
-            );
+        // ANALYZE ONE APPLIANCE AND SAVE IT
+        server.createContext("/analyze", exchange -> {
+            if (!prepareRequest(exchange)) return;
 
             try {
+                Map<String, String> p = parseQuery(
+                        exchange.getRequestURI().getRawQuery()
+                );
 
-                String query = exchange.getRequestURI().getQuery();
+                String name = required(p, "name");
+                double power = number(p, "power");
+                double hours = number(p, "hours");
+                double rate = number(p, "rate");
 
-                String data =
-                        query.substring(query.indexOf("=") + 1);
+                validate(power, hours, rate);
 
-                data = java.net.URLDecoder.decode(data, "UTF-8");
+                Appliance a = new Appliance(name, power, hours, rate);
+
+                // Save the appliance whenever Analyze is clicked.
+                saveAppliance(a);
+
+                String response =
+                        "Appliance: " + a.name +
+                        "\nMonthly Usage: " + a.units + " units" +
+                        "\nEstimated Monthly Bill: Rs. " + a.bill;
+
+                send(exchange, 200, response);
+
+            } catch (IllegalArgumentException e) {
+                send(exchange, 400, e.getMessage());
+            } catch (Exception e) {
+                e.printStackTrace();
+                send(exchange, 500, "Analysis or database error: " +
+                        safeMessage(e));
+            }
+        });
+
+        // ANALYZE AND SAVE ALL APPLIANCES
+        server.createContext("/analyzeAll", exchange -> {
+            if (!prepareRequest(exchange)) return;
+
+            try {
+                Map<String, String> params = parseQuery(
+                        exchange.getRequestURI().getRawQuery()
+                );
+
+                if (params.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "No appliance data received."
+                    );
+                }
+
+                // The frontend sends its appliance list as URL-encoded JSON.
+                String data = params.values().iterator().next();
+                List<Appliance> appliances = parseAppliances(data);
+
+                if (appliances.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "No valid appliances found."
+                    );
+                }
 
                 double totalUnits = 0;
                 double totalBill = 0;
 
-                String[] applianceData =
-                        data.split("\\},\\{");
-
-                for (String appliance : applianceData) {
-
-                    // Appliance name
-                    String name = "Appliance";
-
-                    if (appliance.contains("\"name\":\"")) {
-                        name = appliance
-                                .split("\"name\":\"")[1]
-                                .split("\"")[0];
-                    }
-
-                    // Power
-                    String powerText =
-                            appliance.split("\"power\":")[1]
-                                    .split(",")[0];
-
-                    // Hours
-                    String hoursText =
-                            appliance.split("\"hours\":")[1]
-                                    .split(",")[0];
-
-                    // Rate
-                    String rateText =
-                            appliance.split("\"rate\":")[1]
-                                    .split("}")[0];
-
-                    double power =
-                            Double.parseDouble(powerText);
-
-                    double hours =
-                            Double.parseDouble(hoursText);
-
-                    double rate =
-                            Double.parseDouble(rateText);
-
-                    double monthlyUnits =
-                            (power * hours * 30) / 1000;
-
-                    double monthlyBill =
-                            monthlyUnits * rate;
-
-                    // Save appliance data into SQLite
-                    String insertSQL =
-                            "INSERT INTO appliances " +
-                            "(appliance_name, power_watts, hours_per_day, units_per_month, cost_per_month) " +
-                            "VALUES (?, ?, ?, ?, ?)";
-
-                    try (PreparedStatement statement =
-                                 dbConnection.prepareStatement(insertSQL)) {
-
-                        statement.setString(1, name);
-                        statement.setDouble(2, power);
-                        statement.setDouble(3, hours);
-                        statement.setDouble(4, monthlyUnits);
-                        statement.setDouble(5, monthlyBill);
-
-                        statement.executeUpdate();
-                    }
-
-                    totalUnits += monthlyUnits;
-                    totalBill += monthlyBill;
+                // Validate everything before inserting records.
+                for (Appliance a : appliances) {
+                    validate(a.power, a.hours, a.rate);
+                    totalUnits += a.units;
+                    totalBill += a.bill;
                 }
 
-                double yearlyBill = totalBill * 12;
+                // Insert the batch together.
+                synchronized (dbConnection) {
+                    boolean previousAutoCommit =
+                            dbConnection.getAutoCommit();
+
+                    try {
+                        dbConnection.setAutoCommit(false);
+
+                        String sql =
+                                "INSERT INTO appliances " +
+                                "(appliance_name, power_watts, hours_per_day, " +
+                                "units_per_month, cost_per_month) " +
+                                "VALUES (?, ?, ?, ?, ?)";
+
+                        try (PreparedStatement ps =
+                                     dbConnection.prepareStatement(sql)) {
+                            for (Appliance a : appliances) {
+                                bindAppliance(ps, a);
+                                ps.addBatch();
+                            }
+                            ps.executeBatch();
+                        }
+
+                        dbConnection.commit();
+
+                    } catch (Exception e) {
+                        dbConnection.rollback();
+                        throw e;
+                    } finally {
+                        dbConnection.setAutoCommit(previousAutoCommit);
+                    }
+                }
 
                 String response =
-                        "Total Monthly Usage: " + totalUnits + " units" +
+                        "Total Appliances: " + appliances.size() +
+                        "\nTotal Monthly Usage: " + totalUnits + " units" +
                         "\nTotal Monthly Bill: Rs. " + totalBill +
-                        "\nTotal Yearly Bill: Rs. " + yearlyBill;
+                        "\nTotal Yearly Bill: Rs. " + (totalBill * 12);
 
-                exchange.sendResponseHeaders(
-                        200,
-                        response.length()
-                );
+                send(exchange, 200, response);
 
-                exchange.getResponseBody().write(
-                        response.getBytes()
-                );
-
-                exchange.getResponseBody().close();
-
+            } catch (IllegalArgumentException e) {
+                send(exchange, 400, e.getMessage());
             } catch (Exception e) {
-
-                String response =
-                        "Database or analysis error: " +
-                        e.getMessage();
-
-                exchange.sendResponseHeaders(
-                        500,
-                        response.length()
-                );
-
-                exchange.getResponseBody().write(
-                        response.getBytes()
-                );
-
-                exchange.getResponseBody().close();
-
                 e.printStackTrace();
+                send(exchange, 500, "Database or analysis error: " +
+                        safeMessage(e));
             }
         });
+
+        // VIEW HISTORY
         server.createContext("/history", exchange -> {
+            if (!prepareRequest(exchange)) return;
 
-    exchange.getResponseHeaders().add(
-            "Access-Control-Allow-Origin", "*"
-    );
+            try {
+                StringBuilder response = new StringBuilder();
 
-    try {
+                synchronized (dbConnection) {
+                    String sql =
+                            "SELECT id, appliance_name, power_watts, " +
+                            "hours_per_day, units_per_month, cost_per_month " +
+                            "FROM appliances ORDER BY id DESC";
 
-        StringBuilder response = new StringBuilder();
+                    try (Statement st = dbConnection.createStatement();
+                         ResultSet rs = st.executeQuery(sql)) {
 
-        String sql =
-                "SELECT id, appliance_name, power_watts, " +
-                "hours_per_day, units_per_month, cost_per_month " +
-                "FROM appliances";
+                        while (rs.next()) {
+                            response.append("ID: ")
+                                    .append(rs.getInt("id")).append("\n");
 
-        try (java.sql.Statement statement =
-                     dbConnection.createStatement();
+                            response.append("Appliance: ")
+                                    .append(rs.getString("appliance_name"))
+                                    .append("\n");
 
-             java.sql.ResultSet result =
-                     statement.executeQuery(sql)) {
+                            response.append("Power: ")
+                                    .append(rs.getDouble("power_watts"))
+                                    .append(" W\n");
 
-            while (result.next()) {
+                            response.append("Hours/Day: ")
+                                    .append(rs.getDouble("hours_per_day"))
+                                    .append("\n");
 
-                response.append("ID: ")
-                        .append(result.getInt("id"))
-                        .append("\n");
+                            response.append("Units/Month: ")
+                                    .append(rs.getDouble("units_per_month"))
+                                    .append("\n");
 
-                response.append("Appliance: ")
-                        .append(result.getString("appliance_name"))
-                        .append("\n");
+                            response.append("Cost/Month: Rs. ")
+                                    .append(rs.getDouble("cost_per_month"))
+                                    .append("\n");
 
-                response.append("Power: ")
-                        .append(result.getDouble("power_watts"))
-                        .append(" W\n");
+                            response.append("----------------------------\n");
+                        }
+                    }
+                }
 
-                response.append("Hours/Day: ")
-                        .append(result.getDouble("hours_per_day"))
-                        .append("\n");
+                send(exchange, 200, response.toString());
 
-                response.append("Units/Month: ")
-                        .append(result.getDouble("units_per_month"))
-                        .append("\n");
-
-                response.append("Cost/Month: Rs.")
-                        .append(result.getDouble("cost_per_month"))
-                        .append("\n");
-
-                response.append("----------------------------\n");
+            } catch (Exception e) {
+                e.printStackTrace();
+                send(exchange, 500, "Database history error: " +
+                        safeMessage(e));
             }
-        }
+        });
 
-        byte[] responseBytes =
-                response.toString().getBytes("UTF-8");
+        // CLEAR HISTORY
+        server.createContext("/clearHistory", exchange -> {
+            if (!prepareRequest(exchange)) return;
 
-        exchange.sendResponseHeaders(
-                200,
-                responseBytes.length
-        );
+            try {
+                synchronized (dbConnection) {
+                    try (Statement st = dbConnection.createStatement()) {
+                        st.executeUpdate("DELETE FROM appliances");
+                    }
+                }
 
-        exchange.getResponseBody().write(responseBytes);
-        exchange.getResponseBody().close();
+                send(exchange, 200,
+                        "All appliance history deleted successfully!");
 
-    } catch (Exception e) {
+            } catch (Exception e) {
+                e.printStackTrace();
+                send(exchange, 500, "Delete history error: " +
+                        safeMessage(e));
+            }
+        });
 
-        String response =
-                "Database history error: " +
-                e.getMessage();
-
-        byte[] responseBytes =
-                response.getBytes("UTF-8");
-
-        exchange.sendResponseHeaders(
-                500,
-                responseBytes.length
-        );
-
-        exchange.getResponseBody().write(responseBytes);
-        exchange.getResponseBody().close();
-
-        e.printStackTrace();
-    }
-});
-server.createContext("/clearHistory", exchange -> {
-        exchange.getResponseHeaders().add(
-        "Access-Control-Allow-Origin", "*"
-);
-
-    exchange.getResponseHeaders().add(
-        "Access-Control-Allow-Private-Network",
-        "true"
-);
-
-    try {
-
-        String sql = "DELETE FROM appliances";
-
-        try (java.sql.Statement statement =
-                     dbConnection.createStatement()) {
-
-            statement.executeUpdate(sql);
-        }
-
-        String response = "All appliance history deleted successfully!";
-
-        byte[] responseBytes =
-                response.getBytes("UTF-8");
-
-        exchange.sendResponseHeaders(
-                200,
-                responseBytes.length
-        );
-
-        exchange.getResponseBody().write(responseBytes);
-        exchange.getResponseBody().close();
-
-    } catch (Exception e) {
-
-        String response =
-                "Delete history error: " + e.getMessage();
-
-        byte[] responseBytes =
-                response.getBytes("UTF-8");
-
-        exchange.sendResponseHeaders(
-                500,
-                responseBytes.length
-        );
-
-        exchange.getResponseBody().write(responseBytes);
-        exchange.getResponseBody().close();
-
-        e.printStackTrace();
-    }
-});
-        // Start server
+        server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
         server.start();
 
-        System.out.println(
-                "Server started at http://localhost:8080"
+        System.out.println("Database connected successfully!");
+        System.out.println("Server started on port " + port);
+    }
+
+    private static boolean prepareRequest(HttpExchange exchange)
+            throws IOException {
+
+        exchange.getResponseHeaders().set(
+                "Access-Control-Allow-Origin", "*"
+        );
+        exchange.getResponseHeaders().set(
+                "Access-Control-Allow-Methods", "GET, POST, OPTIONS"
+        );
+        exchange.getResponseHeaders().set(
+                "Access-Control-Allow-Headers", "Content-Type"
         );
 
-        // =========================
-        // CONSOLE PROGRAM
-        // =========================
+        if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+            exchange.sendResponseHeaders(204, -1);
+            exchange.close();
+            return false;
+        }
 
-        Scanner sc = new Scanner(System.in);
+        return true;
+    }
 
-        double totalUnits = 0;
-        double totalBill = 0;
-        double totalYearlyBill = 0;
+    private static void send(
+            HttpExchange exchange, int status, String response)
+            throws IOException {
 
-        int applianceCount = 0;
+        byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
 
-        System.out.print(
-                "How many appliances do you want to enter? "
+        exchange.getResponseHeaders().set(
+                "Content-Type", "text/plain; charset=UTF-8"
         );
 
-        int n = sc.nextInt();
-        sc.nextLine();
+        exchange.sendResponseHeaders(status, bytes.length);
 
-        for (int i = 1; i <= n; i++) {
+        try (java.io.OutputStream out = exchange.getResponseBody()) {
+            out.write(bytes);
+        }
+    }
 
-            System.out.println(
-                    "\n--- Appliance " + i + " ---"
+    private static Map<String, String> parseQuery(String query)
+            throws Exception {
+
+        Map<String, String> result = new LinkedHashMap<>();
+
+        if (query == null || query.isEmpty()) {
+            return result;
+        }
+
+        for (String pair : query.split("&")) {
+            int index = pair.indexOf('=');
+            if (index < 0) continue;
+
+            String key = URLDecoder.decode(
+                    pair.substring(0, index), "UTF-8"
+            );
+            String value = URLDecoder.decode(
+                    pair.substring(index + 1), "UTF-8"
             );
 
-            System.out.print(
-                    "Enter Appliance Name: "
-            );
+            result.put(key, value);
+        }
 
-            String name = sc.nextLine();
+        return result;
+    }
 
-            System.out.print(
-                    "Enter Power (Watts): "
-            );
+    private static String required(
+            Map<String, String> values, String key) {
 
-            double power = sc.nextDouble();
+        String value = values.get(key);
 
-            System.out.print(
-                    "Enter Usage Hours per Day: "
-            );
-
-            double hours = sc.nextDouble();
-
-            System.out.print(
-                    "Enter Electricity Rate per Unit: "
-            );
-
-            double rate = sc.nextDouble();
-
-            sc.nextLine();
-
-            if (power <= 0 || hours <= 0 || rate <= 0) {
-
-                System.out.println(
-                        "Please enter valid values."
-                );
-
-                sc.close();
-                dbConnection.close();
-
-                return;
-            }
-
-            double monthlyUnits =
-                    (power * hours * 30) / 1000;
-
-            double monthlyBill =
-                    monthlyUnits * rate;
-
-            double yearlyUnits =
-                    monthlyUnits * 12;
-
-            double yearlyBill =
-                    monthlyBill * 12;
-
-            totalUnits += monthlyUnits;
-            totalBill += monthlyBill;
-            totalYearlyBill += yearlyBill;
-
-            applianceCount++;
-
-            System.out.println(
-                    "\n--- Electricity Analysis ---"
-            );
-
-            System.out.println(
-                    "Appliance: " + name
-            );
-
-            System.out.println(
-                    "Monthly Usage: " +
-                    monthlyUnits + " units"
-            );
-
-            System.out.println(
-                    "Estimated Monthly Bill: Rs. " +
-                    monthlyBill
-            );
-
-            System.out.println(
-                    "Yearly Usage: " +
-                    yearlyUnits + " units"
-            );
-
-            System.out.println(
-                    "Yearly Bill: Rs. " +
-                    yearlyBill
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Missing required value: " + key
             );
         }
 
-        System.out.println(
-                "\n--- Total Analysis ---"
+        return value.trim();
+    }
+
+    private static double number(
+            Map<String, String> values, String key) {
+
+        try {
+            return Double.parseDouble(required(values, key));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    "Please enter valid numeric values."
+            );
+        }
+    }
+
+    private static void validate(
+            double power, double hours, double rate) {
+
+        if (!Double.isFinite(power) ||
+            !Double.isFinite(hours) ||
+            !Double.isFinite(rate) ||
+            power <= 0 || hours <= 0 || hours > 24 || rate <= 0) {
+
+            throw new IllegalArgumentException(
+                    "Please enter valid values: power and rate must be " +
+                    "positive, and hours must be between 0 and 24."
+            );
+        }
+    }
+
+    private static void saveAppliance(Appliance a) throws Exception {
+        synchronized (dbConnection) {
+            String sql =
+                    "INSERT INTO appliances " +
+                    "(appliance_name, power_watts, hours_per_day, " +
+                    "units_per_month, cost_per_month) VALUES (?, ?, ?, ?, ?)";
+
+            try (PreparedStatement ps =
+                         dbConnection.prepareStatement(sql)) {
+                bindAppliance(ps, a);
+                ps.executeUpdate();
+            }
+        }
+    }
+
+    private static void bindAppliance(
+            PreparedStatement ps, Appliance a) throws Exception {
+
+        ps.setString(1, a.name);
+        ps.setDouble(2, a.power);
+        ps.setDouble(3, a.hours);
+        ps.setDouble(4, a.units);
+        ps.setDouble(5, a.bill);
+    }
+
+    private static List<Appliance> parseAppliances(String json) {
+        List<Appliance> list = new ArrayList<>();
+
+        // Handles the simple appliance JSON objects sent by the frontend.
+        Matcher objects = Pattern.compile("\\{([^{}]*)\\}").matcher(json);
+
+        while (objects.find()) {
+            String object = objects.group(1);
+
+            String name = jsonString(object, "name");
+            double power = jsonNumber(object, "power");
+            double hours = jsonNumber(object, "hours");
+            double rate = jsonNumber(object, "rate");
+
+            list.add(new Appliance(name, power, hours, rate));
+        }
+
+        return list;
+    }
+
+    private static String jsonString(String object, String key) {
+        Pattern pattern = Pattern.compile(
+                "\"" + Pattern.quote(key) +
+                "\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\""
         );
 
-        System.out.println(
-                "Total Appliances: " +
-                applianceCount
+        Matcher matcher = pattern.matcher(object);
+
+        if (!matcher.find()) {
+            throw new IllegalArgumentException(
+                    "Missing appliance field: " + key
+            );
+        }
+
+        return matcher.group(1)
+                .replace("\\\"", "\"")
+                .replace("\\\\", "\\")
+                .trim();
+    }
+
+    private static double jsonNumber(String object, String key) {
+        Pattern pattern = Pattern.compile(
+                "\"" + Pattern.quote(key) +
+                "\"\\s*:\\s*(-?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?)"
         );
 
-        System.out.println(
-                "Total Monthly Usage: " +
-                totalUnits + " units"
-        );
+        Matcher matcher = pattern.matcher(object);
 
-        System.out.println(
-                "Total Monthly Bill: Rs. " +
-                totalBill
-        );
+        if (!matcher.find()) {
+            throw new IllegalArgumentException(
+                    "Missing or invalid appliance field: " + key
+            );
+        }
 
-        System.out.println(
-                "Total Yearly Bill: Rs. " +
-                totalYearlyBill
-        );
+        try {
+            return Double.parseDouble(matcher.group(1));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    "Invalid numeric value for: " + key
+            );
+        }
+    }
 
-        sc.close();
+    private static String safeMessage(Exception e) {
+        String message = e.getMessage();
+        return message == null ? e.getClass().getSimpleName() : message;
     }
 }
