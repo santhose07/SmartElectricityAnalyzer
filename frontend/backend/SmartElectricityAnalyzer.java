@@ -14,14 +14,13 @@ public class SmartElectricityAnalyzer {
         Class.forName("org.sqlite.JDBC");
 
         Connection dbConnection = DriverManager.getConnection(
-                "jdbc:sqlite:../../electricity.db"
+                jdbc:sqlite:/app/electricity.db
         );
 
         System.out.println("Database connected successfully!");
 
-        HttpServer server = HttpServer.create(
-                new java.net.InetSocketAddress(8080), 0
-        );
+        int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
+HttpServer server = HttpServer.create(new java.net.InetSocketAddress(port), 0);
 
         // =========================
         // TEST API
