@@ -459,7 +459,7 @@
         function connectToBackend() {
 
             fetch(
-                "http://localhost:8080/test"
+                "https://smartelectricityanalyzer.onrender.com/test"
             )
 
             .then(
@@ -497,7 +497,7 @@
 
             fetch(
 
-                "http://localhost:8080/analyze?name=" +
+                "https://smartelectricityanalyzer.onrender.com/analyze?name=" +
 
                 encodeURIComponent(
                     appliance.name
@@ -568,7 +568,7 @@
 
             fetch(
 
-                "http://localhost:8080/analyzeAll?data=" +
+                "https://smartelectricityanalyzer.onrender.com/analyzeAll?data=" +
 
                 encodeURIComponent(data)
             )
@@ -610,7 +610,7 @@
         function viewHistory() {
 
             fetch(
-                "http://localhost:8080/history"
+                "https://smartelectricityanalyzer.onrender.com/history"
             )
 
             .then(
@@ -784,7 +784,7 @@
         return;
     }
 
-    fetch("http://localhost:8080/clearHistory")
+    fetch("https://smartelectricityanalyzer.onrender.com/clearHistory")
 
         .then(response => {
 
