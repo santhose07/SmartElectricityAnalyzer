@@ -14,7 +14,7 @@ public class SmartElectricityAnalyzer {
         Class.forName("org.sqlite.JDBC");
 
         Connection dbConnection = DriverManager.getConnection(
-                jdbc:sqlite:/app/electricity.db
+                "jdbc:sqlite:/app/electricity.db"
         );
 
         System.out.println("Database connected successfully!");
