@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>Smart Electricity Usage Analyzer</title>
+
+    <style>
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f2f5f9;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            text-align: center;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0 16px 0;
+            box-sizing: border-box;
+            border-radius: 7px;
+            border: 1px solid #ccc;
+            font-size: 14px;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: #666;
+        }
+
+        button {
+            padding: 11px 18px;
+            margin: 6px;
+            border: none;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            opacity: 0.9;
+        }
+
+        #result,
+        #applianceList {
+            margin: 25px auto;
+            padding: 20px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            line-height: 1.6;
+            overflow-x: auto;
+        }
+
+        #applianceList {
+            text-align: left;
+        }
+
+        #applianceList h3 {
+            text-align: center;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+
+        th {
+            background: #e9eef5;
+            font-weight: bold;
+        }
+
+        @media (max-width: 600px) {
+
+            body {
+                padding: 10px;
+            }
+
+            button {
+                width: 100%;
+                margin: 5px 0;
+            }
+
+            table {
+                font-size: 12px;
+            }
+
+            th,
+            td {
+                padding: 8px;
+            }
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>Smart Electricity Usage Analyzer</h1>
+
+        <p>Analyze your electricity usage easily.</p>
+
+        <h2>Appliance Details</h2>
+
+        <label>Appliance Name:</label>
+        <input type="text" id="applianceName">
+
+        <label>Power Consumption (Watts):</label>
+        <input type="number" id="power">
+
+        <label>Usage Hours per Day:</label>
+        <input type="number" id="hours">
+
+        <label>Electricity Rate per Unit (Rs.):</label>
+        <input type="number" id="rate">
+
+        <br>
+
+        <div class="action-buttons">
+
+    <button onclick="sendDataToBackend()">Analyze</button>
+
+    <button onclick="addAppliance()">Add Appliance</button>
+
+    <button onclick="sendAllAppliancesToBackend()">
+        Analyze All Appliances
+    </button>
+
+</div>
+
+<div class="history-buttons">
+
+    <button onclick="viewHistory()">View History</button>
+
+    <button onclick="clearHistory()">Clear History</button>
+
+</div>
+
+<button style="display:none;" onclick="connectToBackend()">
+    Connect to Backend
+</button>
+
+<button style="display:none;" onclick="sendDataToBackend()">
+    Send Data to Backend
+</button>
+
+        <div id="result"></div>
+
+        <div id="applianceList"></div>
+
+    </div>
+
+
+    <script>
+
+        let appliances = [];
+
+
+        function getApplianceDetails() {
+
+            let applianceName =
+                document.getElementById("applianceName").value.trim();
+
+            let power =
+                Number(document.getElementById("power").value);
+
+            let hours =
+                Number(document.getElementById("hours").value);
+
+            let rate =
+                Number(document.getElementById("rate").value);
+
+
+            if (
+                applianceName === "" ||
+                power <= 0 ||
+                hours <= 0 ||
+                hours > 24 ||
+                rate <= 0
+            ) {
+
+                alert(
+                    "Please enter valid details.\n" +
+                    "Usage hours must be between 1 and 24."
+                );
+
+                return null;
+            }
+
+
+            return {
+                name: applianceName,
+                power: power,
+                hours: hours,
+                rate: rate
+            };
+        }
+
+
+        function analyzeUsage() {
+
+            let appliance = getApplianceDetails();
+
+            if (appliance === null) {
+                return;
+            }
+
+
+            let monthlyUnits =
+                (appliance.power *
+                 appliance.hours *
+                 30) / 1000;
+
+            let estimatedBill =
+                monthlyUnits * appliance.rate;
+
+            let yearlyUnits =
+                monthlyUnits * 12;
+
+            let yearlyBill =
+                estimatedBill * 12;
+
+
+            document.getElementById("result").innerHTML =
+
+                "<h3>Analysis Result</h3>" +
+
+                "<p>Appliance: " +
+                appliance.name +
+                "</p>" +
+
+                "<p>Monthly Usage: " +
+                monthlyUnits.toFixed(2) +
+                " units</p>" +
+
+                "<p>Estimated Bill: Rs. " +
+                estimatedBill.toFixed(2) +
+                "</p>" +
+
+                "<p>Yearly Usage: " +
+                yearlyUnits.toFixed(2) +
+                " units</p>" +
+
+                "<p>Yearly Bill: Rs. " +
+                yearlyBill.toFixed(2) +
+                "</p>";
+        }
+
+
+        function addAppliance() {
+
+            let appliance =
+                getApplianceDetails();
+
+            if (appliance === null) {
+                return;
+            }
+
+
+            appliances.push(appliance);
+
+
+            let list =
+                "<h3>Added Appliances</h3>";
+
+
+            list +=
+                "<p><strong>Total Appliances: " +
+                appliances.length +
+                "</strong></p>";
+
+
+            for (let i = 0; i < appliances.length; i++) {
+
+                list +=
+
+                    "<p>" +
+
+                    (i + 1) +
+                    ". " +
+
+                    appliances[i].name +
+
+                    " - " +
+
+                    appliances[i].power +
+
+                    "W - " +
+
+                    appliances[i].hours +
+
+                    " hrs/day" +
+
+                    "</p>";
+            }
+
+
+            let totalUnits = 0;
+
+
+            for (let i = 0; i < appliances.length; i++) {
+
+                totalUnits +=
+
+                    (
+                        appliances[i].power *
+                        appliances[i].hours *
+                        30
+                    ) / 1000;
+            }
+
+
+            list +=
+
+                "<h3>Total Monthly Usage: " +
+
+                totalUnits.toFixed(2) +
+
+                " units</h3>";
+
+
+            let totalBill = 0;
+
+
+            for (let i = 0; i < appliances.length; i++) {
+
+                let units =
+
+                    (
+                        appliances[i].power *
+                        appliances[i].hours *
+                        30
+                    ) / 1000;
+
+
+                totalBill +=
+                    units * appliances[i].rate;
+            }
+
+
+            list +=
+
+                "<h3>Total Estimated Monthly Bill: Rs. " +
+
+                totalBill.toFixed(2) +
+
+                "</h3>";
+
+
+            list +=
+
+                "<p><strong>Monthly Summary:</strong> " +
+
+                totalUnits.toFixed(2) +
+
+                " units | Rs. " +
+
+                totalBill.toFixed(2) +
+
+                "</p>";
+
+
+            let yearlyBill =
+                totalBill * 12;
+
+
+            list +=
+
+                "<p><strong>Yearly Estimated Bill:</strong> Rs. " +
+
+                yearlyBill.toFixed(2) +
+
+                "</p>";
+
+
+            if (totalUnits > 100) {
+
+                list +=
+
+                    "<p><strong>⚠️ High Electricity Usage!</strong></p>";
+
+                list +=
+
+                    "<p>" +
+                    "Try reducing appliance usage to save electricity." +
+                    "</p>";
+
+            } else {
+
+                list +=
+
+                    "<p>" +
+                    "✅ Your electricity usage is within a reasonable range." +
+                    "</p>";
+            }
+
+
+            list +=
+                "<h3>💡 Electricity Saving Tips</h3>";
+
+
+            list +=
+                "<p>• Switch off appliances when not in use.</p>";
+
+
+            list +=
+                "<p>• Use LED bulbs to reduce electricity consumption.</p>";
+
+
+            list +=
+                "<p>• Avoid keeping appliances on standby unnecessarily.</p>";
+
+
+            document.getElementById("applianceList").innerHTML =
+                list;
+
+
+            alert(
+                appliance.name +
+                " added successfully!"
+            );
+        }
+
+
+        function connectToBackend() {
+
+            fetch(
+                "http://localhost:8080/test"
+            )
+
+            .then(
+                response => response.text()
+            )
+
+            .then(
+                data => {
+                    alert(data);
+                }
+            )
+
+            .catch(
+                error => {
+
+                    alert(
+                        "Backend connection failed!"
+                    );
+
+                    console.log(error);
+                }
+            );
+        }
+
+
+        function sendDataToBackend() {
+
+            let appliance =
+                getApplianceDetails();
+
+            if (appliance === null) {
+                return;
+            }
+
+
+            fetch(
+
+                "http://localhost:8080/analyze?name=" +
+
+                encodeURIComponent(
+                    appliance.name
+                ) +
+
+                "&power=" +
+                appliance.power +
+
+                "&hours=" +
+                appliance.hours +
+
+                "&rate=" +
+                appliance.rate
+            )
+
+            .then(
+                response => response.text()
+            )
+
+            .then(
+                data => {
+
+                    document.getElementById(
+                        "result"
+                    ).innerHTML =
+
+                        "<h3>Java Backend Analysis</h3>" +
+
+                        "<p>" +
+
+                        data.replace(
+                            /\n/g,
+                            "<br>"
+                        ) +
+
+                        "</p>";
+                }
+            )
+
+            .catch(
+                error => {
+
+                    alert(
+                        "Backend connection failed!"
+                    );
+
+                    console.log(error);
+                }
+            );
+        }
+
+
+        function sendAllAppliancesToBackend() {
+
+            if (appliances.length === 0) {
+
+                alert(
+                    "Please add at least one appliance."
+                );
+
+                return;
+            }
+
+
+            let data =
+                JSON.stringify(appliances);
+
+
+            fetch(
+
+                "http://localhost:8080/analyzeAll?data=" +
+
+                encodeURIComponent(data)
+            )
+
+            .then(
+                response => response.text()
+            )
+
+            .then(
+                result => {
+
+                    document.getElementById(
+                        "result"
+                    ).innerHTML =
+
+                        "<h3>Multiple Appliance Analysis</h3>" +
+
+                        "<p>" +
+
+                        result +
+
+                        "</p>";
+                }
+            )
+
+            .catch(
+                error => {
+
+                    alert(
+                        "Backend connection failed!"
+                    );
+
+                    console.log(error);
+                }
+            );
+        }
+
+
+        function viewHistory() {
+
+            fetch(
+                "http://localhost:8080/history"
+            )
+
+            .then(
+                response => response.text()
+            )
+
+            .then(
+                data => {
+
+                    const records =
+
+                        data
+                        .split(
+                            "----------------------------"
+                        )
+                        .filter(
+                            record =>
+                                record.trim() !== ""
+                        );
+
+
+                    let table =
+
+                        "<h3>Saved Appliance History</h3>" +
+
+                        "<table>" +
+
+                        "<tr>" +
+
+                        "<th>ID</th>" +
+
+                        "<th>Appliance</th>" +
+
+                        "<th>Power (W)</th>" +
+
+                        "<th>Hours/Day</th>" +
+
+                        "<th>Units/Month</th>" +
+
+                        "<th>Cost/Month</th>" +
+
+                        "</tr>";
+
+
+                    records.forEach(
+                        record => {
+
+                            const lines =
+                                record.trim().split("\n");
+
+
+                            const id =
+                                lines[0]
+                                .replace(
+                                    "ID: ",
+                                    ""
+                                );
+
+
+                            const appliance =
+                                lines[1]
+                                .replace(
+                                    "Appliance: ",
+                                    ""
+                                );
+
+
+                            const power =
+                                lines[2]
+                                .replace(
+                                    "Power: ",
+                                    ""
+                                )
+                                .replace(
+                                    " W",
+                                    ""
+                                );
+
+
+                            const hours =
+                                lines[3]
+                                .replace(
+                                    "Hours/Day: ",
+                                    ""
+                                );
+
+
+                            const units =
+                                lines[4]
+                                .replace(
+                                    "Units/Month: ",
+                                    ""
+                                );
+
+
+                            const cost =
+                                lines[5]
+                                .replace(
+                                    "Cost/Month: Rs.",
+                                    ""
+                                );
+
+
+                            table +=
+
+                                "<tr>" +
+
+                                "<td>" +
+                                id +
+                                "</td>" +
+
+                                "<td>" +
+                                appliance +
+                                "</td>" +
+
+                                "<td>" +
+                                power +
+                                "</td>" +
+
+                                "<td>" +
+                                hours +
+                                "</td>" +
+
+                                "<td>" +
+                                units +
+                                "</td>" +
+
+                                "<td>Rs." +
+                                cost +
+                                "</td>" +
+
+                                "</tr>";
+                        }
+                    );
+
+
+                    table +=
+                        "</table>";
+
+
+                    if (records.length === 0) {
+
+                        table +=
+                            "<p>No appliance history found.</p>";
+                    }
+
+
+                    document.getElementById(
+                        "result"
+                    ).innerHTML =
+                        table;
+                }
+            )
+
+            .catch(
+                error => {
+
+                    alert(
+                        "Unable to load appliance history!"
+                    );
+
+                    console.log(error);
+                }
+            );
+        }
+
+
+        function clearHistory() {
+
+    if (!confirm("Are you sure you want to clear all appliance history?")) {
+        return;
+    }
+
+    fetch("http://localhost:8080/clearHistory")
+
+        .then(response => {
+
+            if (!response.ok) {
+                throw new Error("Server returned an error");
+            }
+
+            return response.text();
+        })
+
+        .then(data => {
+
+            appliances = [];
+
+            document.getElementById("applianceList").innerHTML = "";
+
+            alert(data);
+
+            viewHistory();
+        })
+
+        .catch(error => {
+
+            alert("Unable to clear appliance history!");
+
+            console.log(error);
+        });
+}
+
+    </script>
+
+</body>
+
+</html>
