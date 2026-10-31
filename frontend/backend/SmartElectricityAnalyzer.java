@@ -196,7 +196,8 @@ public class SmartElectricityAnalyzer {
                         safeMessage(e));
             }
         });
-// PYTHON ANALYZER API
+
+        // PYTHON ANALYZER API
         server.createContext("/pythonAnalyze", exchange -> {
             if (!prepareRequest(exchange)) return;
 
@@ -242,7 +243,17 @@ public class SmartElectricityAnalyzer {
                     return;
                 }
 
-                send(exchange,
+                send(exchange, 200, result);
+
+            } catch (IllegalArgumentException e) {
+                send(exchange, 400, e.getMessage());
+            } catch (Exception e) {
+                e.printStackTrace();
+                send(exchange, 500,
+                        "Python integration error: " + safeMessage(e));
+            }
+        });
+
         // VIEW HISTORY
         server.createContext("/history", exchange -> {
             if (!prepareRequest(exchange)) return;
