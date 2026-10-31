@@ -196,7 +196,53 @@ public class SmartElectricityAnalyzer {
                         safeMessage(e));
             }
         });
+// PYTHON ANALYZER API
+        server.createContext("/pythonAnalyze", exchange -> {
+            if (!prepareRequest(exchange)) return;
 
+            try {
+                Map<String, String> p = parseQuery(
+                        exchange.getRequestURI().getRawQuery()
+                );
+
+                String name = required(p, "name");
+                double power = number(p, "power");
+                double hours = number(p, "hours");
+                double rate = number(p, "rate");
+
+                validate(power, hours, rate);
+
+                ProcessBuilder pb = new ProcessBuilder(
+                        "python3",
+                        "analyzer.py",
+                        name,
+                        String.valueOf(power),
+                        String.valueOf(hours),
+                        String.valueOf(rate)
+                );
+
+                pb.redirectErrorStream(true);
+
+                Process process = pb.start();
+
+                String result;
+                try (java.io.InputStream input =
+                             process.getInputStream()) {
+                    result = new String(
+                            input.readAllBytes(),
+                            StandardCharsets.UTF_8
+                    );
+                }
+
+                int exitCode = process.waitFor();
+
+                if (exitCode != 0) {
+                    send(exchange, 500,
+                            "Python analysis failed: " + result);
+                    return;
+                }
+
+                send(exchange,
         // VIEW HISTORY
         server.createContext("/history", exchange -> {
             if (!prepareRequest(exchange)) return;

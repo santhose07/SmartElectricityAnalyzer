@@ -17,4 +17,15 @@ def analyze_appliance(name, watts, hours_per_day, rate):
         print("Suggestion: Continue monitoring your usage.")
 
 
-analyze_appliance("Fan", 75, 8, 5)
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) == 5:
+        analyze_appliance(
+            sys.argv[1],
+            float(sys.argv[2]),
+            float(sys.argv[3]),
+            float(sys.argv[4])
+        )
+    else:
+        analyze_appliance("Fan", 75, 8, 5)
