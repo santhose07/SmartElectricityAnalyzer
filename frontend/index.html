@@ -117,6 +117,77 @@
 
     <label>Power Consumption (Watts):</label>
     <input type="number" id="power">
+    <h3>Wattage Guide</h3>
+
+<p>
+    Don't know your appliance wattage?
+    Select an appliance to get an approximate value.
+</p>
+
+<label>Select Appliance:</label>
+
+<label>Select Appliance Wattage:</label>
+
+<select id="wattageGuide" onchange="updateSuggestedWattage()">
+    <option value="">-- Select Wattage --</option>
+
+    <optgroup label="Ceiling Fan">
+        <option value="30">30 W - Energy Efficient Fan</option>
+        <option value="50">50 W - Low Power Fan</option>
+        <option value="75">75 W - Normal Fan</option>
+        <option value="100">100 W - High Power Fan</option>
+    </optgroup>
+
+    <optgroup label="LED Bulb">
+        <option value="5">5 W - Small LED Bulb</option>
+        <option value="9">9 W - Normal LED Bulb</option>
+        <option value="12">12 W - Bright LED Bulb</option>
+        <option value="15">15 W - High Brightness Bulb</option>
+        <option value="20">20 W - High Power Bulb</option>
+    </optgroup>
+
+   <optgroup label="LED Tube Light">
+    <option value="18">18 W - Low Power</option>
+    <option value="20">20 W - Normal</option>
+    <option value="22">22 W - High Power</option>
+</optgroup>
+
+<optgroup label="LED TV">
+    <option value="50">50 W - Low Power</option>
+    <option value="100">100 W - Normal</option>
+    <option value="150">150 W - High Power</option>
+</optgroup>
+
+<optgroup label="Laptop">
+    <option value="45">45 W - Low Power</option>
+    <option value="65">65 W - Normal</option>
+    <option value="90">90 W - High Power</option>
+</optgroup>
+
+<optgroup label="Refrigerator">
+    <option value="100">100 W - Low Power</option>
+    <option value="150">150 W - Normal</option>
+    <option value="200">200 W - High Power</option>
+</optgroup>
+
+<optgroup label="Other Appliances">
+    <option value="200">200 W - Desktop Computer</option>
+    <option value="10">10 W - Wi-Fi Router</option>
+    <option value="50">50 W - Printer</option>
+</optgroup>
+</select>
+
+<p id="wattageMessage">
+    Select an appliance to see its suggested wattage.
+</p>
+
+<p>
+    <small>
+        Note: These are approximate values.
+        Actual wattage may vary depending on the appliance model.
+        Check the appliance label for accurate wattage.
+    </small>
+</p>
 
     <label>Usage Hours per Day:</label>
     <input type="number" id="hours">
@@ -146,6 +217,22 @@
         "https://smartelectricityanalyzer.onrender.com";
 
     let appliances = [];
+    function updateSuggestedWattage() {
+    const guide = document.getElementById("wattageGuide");
+
+    const selectedOption = guide.options[guide.selectedIndex];
+
+    if (guide.value === "") {
+        document.getElementById("wattageMessage").innerText =
+            "Select an appliance to see its suggested wattage.";
+        return;
+    }
+
+    document.getElementById("power").value = guide.value;
+
+    document.getElementById("wattageMessage").innerText =
+        selectedOption.text + " selected. You can edit the wattage if needed.";
+}
 
     function getApplianceDetails() {
         let applianceName =
