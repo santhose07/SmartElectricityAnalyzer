@@ -5,44 +5,39 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Smart Electricity Usage Analyzer</title>
 <style>
-    * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; background:#f2f5f9; margin:0; padding:20px; color:#222; }
-    .container { max-width:950px; margin:auto; background:white; padding:24px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,.1); }
-    h1,h2 { text-align:center; }
-    .muted { color:#666; text-align:center; }
-    .panel { background:#f8f9fa; border:1px solid #ddd; border-radius:10px; padding:16px; margin:18px 0; }
-    label { display:block; font-weight:bold; margin-top:10px; }
-    input,select { width:100%; padding:12px; margin:8px 0 12px; border:1px solid #ccc; border-radius:7px; font-size:14px; }
-    button { padding:11px 18px; margin:5px; border:0; border-radius:7px; cursor:pointer; font-size:14px; font-weight:bold; background:#2457a7; color:white; }
-    button:hover { opacity:.88; }
-    button.secondary { background:#5d6878; }
-    button.danger { background:#b83232; }
-    button.admin { background:#6544a5; }
-    .button-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
-    .button-row button { flex:1 1 170px; }
-    #result,#applianceList { margin:20px 0; padding:18px; background:#f8f9fa; border:1px solid #ddd; border-radius:10px; line-height:1.6; overflow-x:auto; }
-    table { width:100%; margin-top:15px; border-collapse:collapse; background:white; }
-    th,td { padding:10px; text-align:center; border:1px solid #ddd; }
-    th { background:#e9eef5; }
-    .wattage-guide { margin:12px 0 16px; padding:12px; border:1px solid #ddd; border-radius:7px; background:#f8f9fa; }
-    .wattage-guide summary { cursor:pointer; font-weight:bold; }
-    .wattage-guide small { color:#666; }
-    .hidden { display:none !important; }
-    .status { padding:10px; border-radius:7px; background:#edf3ff; margin:12px 0; overflow-wrap:anywhere; }
-    @media(max-width:600px) {
-        body { padding:10px; }
-        .container { padding:15px; }
-        button { width:100%; margin:4px 0; }
-        .button-row { display:block; }
-        table { font-size:12px; }
-        th,td { padding:7px; }
-    }
+*{box-sizing:border-box}
+:root{--navy:#071b4b;--blue:#123b85;--green:#16a34a;--ink:#10234b;--muted:#65738b}
+body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:24px 16px;background:linear-gradient(135deg,#eaf3ff 0%,#f4f1ff 48%,#e8fff6 100%);color:var(--ink)}
+.container{max-width:1180px;margin:0 auto;background:#fff;padding:24px;border-radius:24px;box-shadow:0 18px 55px rgba(25,55,110,.14);border:1px solid rgba(255,255,255,.9)}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:linear-gradient(110deg,#061746,#102f72);color:white;padding:17px 22px;border-radius:18px;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:12px;font-size:clamp(18px,3vw,25px);font-weight:800;letter-spacing:-.5px}.brand-mark{width:48px;height:48px;border-radius:15px;background:linear-gradient(145deg,#fff,#dceaff);display:grid;place-items:center;color:#0b3980;font-size:27px;box-shadow:0 5px 14px #0003}.brand span{color:#a3f56b}
+.topbar-note{font-size:12px;color:#d9e7ff}
+h1,h2,h3{color:var(--ink)}h1,h2{text-align:center}.muted{color:var(--muted);text-align:center;line-height:1.5}
+.hero{display:grid;grid-template-columns:1.1fr .9fr;align-items:center;gap:20px;overflow:hidden;position:relative;padding:28px 30px;margin:16px 0 22px;border-radius:21px;background:linear-gradient(110deg,#eaf3ff 0%,#f8fbff 52%,#d7f8ec 100%);border:1px solid #d8e7ff;box-shadow:0 8px 22px rgba(36,87,167,.09)}
+.hero h1{text-align:left;font-size:clamp(25px,4vw,39px);line-height:1.12;margin:0 0 10px}.hero h1 .green{color:#159447}.hero p{margin:0;color:#334766;line-height:1.55;max-width:560px}.hero-art{min-height:145px;border-radius:18px;background:radial-gradient(circle at 50% 45%,#fff9c6 0 8%,#a5e8ff 9% 23%,transparent 24%),linear-gradient(135deg,#1d75c7,#9de6ff 55%,#d7f7d7);display:grid;place-items:center;font-size:76px;position:relative}.hero-art:after{content:'POWER SMART • LIVE GREEN';position:absolute;bottom:12px;right:14px;font-size:10px;letter-spacing:1.5px;font-weight:800;color:#123b68;background:#ffffffc9;padding:7px 10px;border-radius:30px}
+.panel{background:#f7faff;border:1px solid #e0e9f6;border-radius:18px;padding:20px;margin:18px 0;box-shadow:0 5px 18px rgba(25,55,110,.05)}
+label{display:block;font-weight:700;margin-top:12px;color:#24395e}input,select{width:100%;padding:13px 14px;margin:8px 0 12px;border:1px solid #cfdaeb;border-radius:11px;font-size:15px;background:#fff;color:#172b4d;outline:none}input:focus,select:focus{border-color:#3987e8;box-shadow:0 0 0 3px #3987e81c}
+button{border:0;border-radius:13px;cursor:pointer;font-size:14px;font-weight:800;color:#fff;padding:13px 16px;display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:54px;box-shadow:0 7px 14px rgba(10,35,80,.15);transition:transform .16s ease,filter .16s ease;letter-spacing:.1px}button:hover{filter:brightness(1.06);transform:translateY(-2px)}button:active{transform:translateY(0)}button svg{width:23px;height:23px;flex:none;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+button.auth-register{background:linear-gradient(135deg,#16a34a,#08743a);color:#fff}button.auth-login{background:linear-gradient(135deg,#2563eb,#123d9b);color:#fff}button.primary{background:linear-gradient(135deg,#2563eb,#1243a4)}button.python{background:linear-gradient(135deg,#8b2be2,#5410b8)}button.teal{background:linear-gradient(135deg,#12b7c9,#087b9d)}button.secondary{background:linear-gradient(135deg,#ffc83d,#df8b00);color:#fff}button.danger{background:linear-gradient(135deg,#ff665f,#d92732);color:#fff}button.add{background:linear-gradient(135deg,#35c95c,#07843b)}button.admin{background:linear-gradient(135deg,#5965db,#3936a4)}button.logout{background:#ffffff1c;border:1px solid #ffffff55;box-shadow:none;min-height:38px;padding:8px 13px}
+.button-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px;margin:18px 0}.button-row button{width:100%;min-height:72px;text-align:left;justify-content:flex-start;padding:14px 16px}.button-row button .btn-label{display:flex;flex-direction:column;gap:3px}.button-row button small{font-size:10px;font-weight:600;opacity:.88}
+#result,#applianceList{margin:20px 0;padding:20px;background:#f8fbff;border:1px solid #e0eaf7;border-radius:16px;line-height:1.6;overflow-x:auto}#result:empty,#applianceList:empty{display:none}
+table{width:100%;margin-top:15px;border-collapse:separate;border-spacing:0;background:white;border-radius:12px;overflow:hidden}th,td{padding:11px;text-align:center;border-bottom:1px solid #e5ebf4}th{background:#eaf1ff;color:#18396f}tr:last-child td{border-bottom:0}
+.wattage-guide{margin:14px 0 18px;padding:14px;border:1px solid #dce7f5;border-radius:12px;background:#fff}.wattage-guide summary{cursor:pointer;font-weight:800;color:#244d87}.wattage-guide small{color:#65738b}
+.hidden{display:none!important}.status{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:13px 16px;border-radius:13px;background:#edf4ff;border:1px solid #dce8fa;margin:12px 0 20px;overflow-wrap:anywhere}.appliance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:15px 0}.appliance-card{display:flex;align-items:center;gap:13px;padding:14px;background:white;border:1px solid #e3eaf4;border-radius:15px;box-shadow:0 5px 14px #163d7410}.appliance-icon{width:52px;height:52px;display:grid;place-items:center;flex:none;border-radius:15px;color:white;font-size:25px;box-shadow:inset 0 1px 0 #ffffff55}.appliance-card strong{display:block;color:#172f59}.appliance-card small{display:block;color:#697890;margin-top:4px}.wattage-guide p{line-height:1.5}.footer-note{text-align:center;color:#16845b;font-size:13px;font-weight:700;margin:24px 0 4px}
+@media(max-width:700px){body{padding:10px}.container{padding:12px;border-radius:17px}.topbar{padding:13px 14px}.hero{grid-template-columns:1fr;padding:20px}.hero-art{min-height:110px;font-size:55px}.button-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.button-row button{min-height:76px;padding:11px;font-size:12px;gap:7px}.button-row button svg{width:21px;height:21px}.button-row button small{font-size:9px}.status{align-items:flex-start}table{font-size:12px}th,td{padding:8px}}
+@media(max-width:390px){.button-row{grid-template-columns:1fr}.brand{font-size:17px}}
 </style>
 </head>
 <body>
 <div class="container">
-    <h1>Smart Electricity Usage Analyzer</h1>
-    <p class="muted">Analyze your electricity usage easily and manage your appliance history.</p>
+    <header class="topbar">
+        <div class="brand"><div class="brand-mark">⚡</div><div>Smart Electricity<br><span>Usage Analyzer</span></div></div>
+        <div class="topbar-note">SMART ENERGY • SMART SAVINGS</div>
+    </header>
+    <section class="hero">
+        <div><h1>Monitor • <span class="green">Analyze</span> • Save</h1><p>Track your electricity consumption, understand appliance costs and make smarter energy-saving decisions.</p></div>
+        <div class="hero-art" aria-hidden="true">💡</div>
+    </section>
 
     <section id="authSection" class="panel">
         <h2>Account</h2>
@@ -52,8 +47,8 @@
         <label for="authPassword">Password:</label>
         <input type="password" id="authPassword" autocomplete="current-password" placeholder="At least 8 characters">
         <div class="button-row">
-            <button type="button" onclick="registerUser()">Register</button>
-            <button type="button" onclick="loginUser()">Login</button>
+            <button type="button" class="auth-register" onclick="registerUser()"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm10 0v6m-3-3h6"/></svg><span class="btn-label">Register<small>Create your account</small></span></button>
+            <button type="button" class="auth-login" onclick="loginUser()"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5m5 5H3m9-9h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></svg><span class="btn-label">Login<small>Access your dashboard</small></span></button>
         </div>
     </section>
 
@@ -61,7 +56,7 @@
         <div class="status">
             Logged in as: <strong id="loggedInEmail"></strong>
             (<span id="loggedInRole"></span>)
-            <button type="button" class="secondary" onclick="logoutUser()">Logout</button>
+            <button type="button" class="logout" onclick="logoutUser()"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></svg>Logout</button>
         </div>
 
         <section id="analyzerSection">
@@ -126,14 +121,12 @@
             <input type="number" id="rate" min="0.01" step="any" placeholder="Example: 5">
 
             <div class="button-row">
-                <button type="button" onclick="sendDataToBackend()">Analyze</button>
-                <button type="button" onclick="sendDataToPythonAnalyzer()">Python Analysis</button>
-                <button type="button" onclick="addAppliance()">Add Appliance</button>
-                <button type="button" onclick="sendAllAppliancesToBackend()">Analyze All Appliances</button>
-            </div>
-            <div class="button-row">
-                <button type="button" class="secondary" onclick="viewHistory()">View My History</button>
-                <button type="button" class="danger" onclick="clearHistory()">Clear My History</button>
+                <button type="button" class="primary" onclick="sendDataToBackend()"><svg viewBox="0 0 24 24"><path d="M4 19V5m0 14h16M8 15l3-4 3 2 5-7"/></svg><span class="btn-label">Analyze<small>Java usage analysis</small></span></button>
+                <button type="button" class="python" onclick="sendDataToPythonAnalyzer()"><svg viewBox="0 0 24 24"><path d="M12 3c-4 0-4 2-4 4v2h8v2H6c-2 0-3 2-3 5s1 5 4 5h2v-3c0-2 1-3 3-3h4c2 0 3-1 3-3V7c0-3-2-4-7-4Z"/><circle cx="11" cy="6" r=".7" fill="currentColor"/><path d="M12 21c4 0 4-2 4-4v-2H8v-2h10c2 0 3-2 3-5s-1-5-4-5h-2"/></svg><span class="btn-label">Python Analyze<small>Get smart insights</small></span></button>
+                <button type="button" class="teal" onclick="sendAllAppliancesToBackend()"><svg viewBox="0 0 24 24"><path d="M4 19V9m6 10V5m6 14v-7m4 7V3M2 21h20"/></svg><span class="btn-label">Analyze All<small>Complete appliance report</small></span></button>
+                <button type="button" class="secondary" onclick="viewHistory()"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5m4-1v5l3 2"/></svg><span class="btn-label">View My History<small>Check your records</small></span></button>
+                <button type="button" class="danger" onclick="clearHistory()"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/></svg><span class="btn-label">Clear My History<small>Remove your data</small></span></button>
+                <button type="button" class="add" onclick="addAppliance()"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="btn-label">Add Appliance<small>Track new device</small></span></button>
             </div>
             <div id="applianceList"></div>
         </section>
@@ -142,14 +135,15 @@
             <h2>Admin Dashboard</h2>
             <p class="muted">Admin-only information.</p>
             <div class="button-row">
-                <button type="button" class="admin" onclick="loadAdminUsers()">View Registered Users</button>
-                <button type="button" class="admin" onclick="loadAdminHistory()">View All Appliance Records</button>
+                <button type="button" class="admin" onclick="loadAdminUsers()"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 11v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="btn-label">Registered Users<small>Manage accounts overview</small></span></button>
+                <button type="button" class="admin" onclick="loadAdminHistory()"><svg viewBox="0 0 24 24"><path d="M4 19V5m0 14h16M8 15l3-4 3 2 5-7"/></svg><span class="btn-label">All Appliance Records<small>View system activity</small></span></button>
             </div>
             <div id="adminResult"></div>
         </section>
     </section>
 
     <div id="result" aria-live="polite"></div>
+    <div class="footer-note">🍃 A Smart Step Towards a Greener Tomorrow</div>
 </div>
 
 <script>
@@ -306,13 +300,22 @@
         appliances.push(appliance);
         let totalUnits = 0, totalBill = 0;
         let output = "<h3>Added Appliances</h3><p><strong>Total Appliances: " + appliances.length + "</strong></p>";
+        output += "<div class=\"appliance-grid\">";
         appliances.forEach((item, index) => {
             const units = item.power * item.hours * 30 / 1000;
             totalUnits += units;
             totalBill += units * item.rate;
-            output += "<p>" + (index + 1) + ". " + escapeHTML(item.name) +
-                " - " + item.power + " W - " + item.hours + " hrs/day</p>";
+            const key = item.name.toLowerCase();
+            let symbol = "🔌", tile = "linear-gradient(135deg,#64748b,#334155)";
+            if (key.includes("fan")) { symbol = "🌀"; tile = "linear-gradient(135deg,#0ea5e9,#075985)"; }
+            else if (key.includes("tv")) { symbol = "📺"; tile = "linear-gradient(135deg,#8b5cf6,#5b21b6)"; }
+            else if (key.includes("ac") || key.includes("air conditioner")) { symbol = "❄️"; tile = "linear-gradient(135deg,#06b6d4,#0e7490)"; }
+            else if (key.includes("fridge") || key.includes("refrigerator")) { symbol = "🧊"; tile = "linear-gradient(135deg,#38bdf8,#2563eb)"; }
+            else if (key.includes("light") || key.includes("bulb")) { symbol = "💡"; tile = "linear-gradient(135deg,#fbbf24,#d97706)"; }
+            else if (key.includes("laptop") || key.includes("computer")) { symbol = "💻"; tile = "linear-gradient(135deg,#8b5cf6,#4338ca)"; }
+            output += "<div class=\"appliance-card\"><div class=\"appliance-icon\" style=\"background:" + tile + "\">" + symbol + "</div><div><strong>" + escapeHTML(item.name) + "</strong><small>" + item.power + " W &nbsp;•&nbsp; " + item.hours + " hrs/day</small><small>" + units.toFixed(2) + " units/month</small></div></div>";
         });
+        output += "</div>";
         output += "<h3>Total Monthly Usage: " + totalUnits.toFixed(2) + " units</h3>";
         output += "<h3>Total Estimated Monthly Bill: Rs. " + totalBill.toFixed(2) + "</h3>";
         output += "<p><strong>Yearly Estimated Bill:</strong> Rs. " + (totalBill * 12).toFixed(2) + "</p>";
