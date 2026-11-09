@@ -243,7 +243,7 @@
 
     async function logoutUser() {
         try {
-            await apiRequest("/logout");
+            await apiRequest("/logout", { method: "POST" });
         } catch (error) {
             // Clear the browser session even if the server session has expired.
         }
@@ -366,7 +366,7 @@
     async function clearHistory() {
         if (!confirm("Are you sure you want to clear your appliance history?")) return;
         try {
-            const message = await apiRequest("/clearHistory");
+            const message = await apiRequest("/clearHistory", { method: "POST" });
             appliances = [];
             document.getElementById("applianceList").innerHTML = "";
             alert(message);
